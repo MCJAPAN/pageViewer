@@ -64,6 +64,11 @@
       display: block;
     }
 
+    #previewImage {
+      width: 100%;
+      display: block;
+    }
+
     @media (max-width: 600px) {
       input, select, button {
         width: 100%;
@@ -96,45 +101,71 @@
 
   <p>サイズ計測は<a href="https://x.gd/ewrwr4">こちらのサイト</a>がおすすめです（別サイトです）</p>
 
-  <button onclick="showSite()">表示する</button>
+  <div style="margin-top: 1rem;">
+    <button onclick="showIframe()">iframeモード</button>
+    <button onclick="showImage()">画像モード（旧）</button>
+  </div>
 
   <div id="viewer" style="display:none;">
-    <iframe id="frame" src=""></iframe>
+    <iframe id="frame" src="" sandbox="allow-scripts allow-forms allow-same-origin"></iframe>
+    <img id="previewImage" src="" style="display:none;">
   </div>
 
   <script>
     function applyPreset() {
       const value = document.getElementById("preset").value;
       if (!value) return;
-
       const [w, h] = value.split("x");
       document.getElementById("width").value = w;
       document.getElementById("height").value = h;
     }
 
-    function showSite() {
+    function getInputValues() {
       const url = document.getElementById('url').value.trim();
       const h = parseInt(document.getElementById('height').value.trim(), 10);
       const w = parseInt(document.getElementById('width').value.trim(), 10);
-
       if (!url.startsWith('https://')) {
         alert('URLは https:// から始めてください！');
-        return;
+        return null;
       }
       if (isNaN(h) || isNaN(w)) {
-        alert('縦横サイズは正しく入力してください！');
-        return;
+        alert('縦横サイズを正しく入力してください！');
+        return null;
       }
+      return { url, w, h };
+    }
+
+    function showIframe() {
+      const vals = getInputValues();
+      if (!vals) return;
+      const { url, w, h } = vals;
+
+      const frame = document.getElementById('frame');
+      const img = document.getElementById('previewImage');
+      document.getElementById('viewer').style.display = 'block';
+
+      frame.src = url;
+      frame.style.width = w + 'px';
+      frame.style.height = h + 'px';
+      frame.style.display = 'block';
+      img.style.display = 'none';
+    }
+
+    function showImage() {
+      const vals = getInputValues();
+      if (!vals) return;
+      const { url, w, h } = vals;
 
       const encodedURL = encodeURIComponent(url);
       const finalURL = `https://s.wordpress.com/mshots/v1/${encodedURL}?w=${w}&h=${h}&r=1`;
 
       const frame = document.getElementById('frame');
-      frame.src = finalURL;
-      frame.style.height = h + 'px';
-      frame.style.width = '100%';
-
+      const img = document.getElementById('previewImage');
       document.getElementById('viewer').style.display = 'block';
+
+      img.src = finalURL;
+      img.style.display = 'block';
+      frame.style.display = 'none';
     }
   </script>
 
