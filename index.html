@@ -111,63 +111,273 @@
     <img id="previewImage" src="" style="display:none;">
   </div>
 
-  <script>
-    function applyPreset() {
-      const value = document.getElementById("preset").value;
-      if (!value) return;
-      const [w, h] = value.split("x");
-      document.getElementById("width").value = w;
-      document.getElementById("height").value = h;
-    }
+  <script><script>
+// 元の applyPreset（そのまま使える）
+function applyPreset() {
+  const value = document.getElementById("preset").value;
+  if (!value) return;
+  const [w, h] = value.split("x");
+  document.getElementById("width").value = w;
+  document.getElementById("height").value = h;
+}
 
-    function getInputValues() {
-      const url = document.getElementById('url').value.trim();
-      const h = parseInt(document.getElementById('height').value.trim(), 10);
-      const w = parseInt(document.getElementById('width').value.trim(), 10);
-      if (!url.startsWith('https://')) {
-        alert('URLは https:// から始めてください！');
-        return null;
+// 入力値取得・検証
+function getInputValues() {
+  const url = document.getElementById('url').value.trim();
+  const h = parseInt(document.getElementById('height').value.trim(), 10);
+  const w = parseInt(document.getElementById('width').value.trim(), 10);
+
+  if (!url.startsWith('https://')) {
+    alert('URLは https:// から始めてください！');
+    return null;
+  }
+  if (isNaN(h) || isNaN(w)) {
+    alert('縦横サイズを正しく入力してください！');
+    return null;
+  }
+  return { url, w, h };
+}
+
+// 補正ロジック：YouTube ID 抽出
+function extractYouTubeId(url) {
+  try {
+    const u = new URL(url);
+    if (u.searchParams.has('v')) {
+      const v = u.searchParams.get('v');
+      if (v && /^[A-Za-z0-9_-]{11}$/.test(v)) {
+        return v;
       }
-      if (isNaN(h) || isNaN(w)) {
-        alert('縦横サイズを正しく入力してください！');
-        return null;
+    }
+    if (u.hostname === 'youtu.be' || u.hostname === 'www.youtu.be') {
+      const id = u.pathname.slice(1);
+      if (/^[A-Za-z0-9_-]{11}$/.test(id)) {
+        return id;
       }
-      return { url, w, h };
     }
-
-    function showIframe() {
-      const vals = getInputValues();
-      if (!vals) return;
-      const { url, w, h } = vals;
-
-      const frame = document.getElementById('frame');
-      const img = document.getElementById('previewImage');
-      document.getElementById('viewer').style.display = 'block';
-
-      frame.src = url;
-      frame.style.width = w + 'px';
-      frame.style.height = h + 'px';
-      frame.style.display = 'block';
-      img.style.display = 'none';
+    const parts = u.pathname.split('/');
+    const embedIndex = parts.indexOf('embed');
+    if (embedIndex >= 0 && parts.length > embedIndex + 1) {
+      const id = parts[embedIndex + 1];
+      if (/^[A-Za-z0-9_-]{11}$/.test(id)) {
+        return id;
+      }
     }
-
-    function showImage() {
-      const vals = getInputValues();
-      if (!vals) return;
-      const { url, w, h } = vals;
-
-      const encodedURL = encodeURIComponent(url);
-      const finalURL = `https://s.wordpress.com/mshots/v1/${encodedURL}?w=${w}&h=${h}&r=1`;
-
-      const frame = document.getElementById('frame');
-      const img = document.getElementById('previewImage');
-      document.getElementById('viewer').style.display = 'block';
-
-      img.src = finalURL;
-      img.style.display = 'block';
-      frame.style.display = 'none';
+    const shortsIndex = parts.indexOf('shorts');
+    if (shortsIndex >= 0 && parts.length > shortsIndex + 1) {
+      const id = parts[shortsIndex + 1];
+      if (/^[A-Za-z0-9_-]{11}$/.test(id)) {
+        return id;
+      }
     }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+// Vimeo 補正ロジック
+function extractVimeoId(url) {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split('/');
+    for (const part of parts) {
+      if (/^[0-9]+$/.test(part)) {
+        return part;
+      }
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+// ニコニコ補正ロジック
+function extractNicoId(url) {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split('/');
+    const watchIndex = parts.indexOf('watch');
+    if (watchIndex >= 0 && parts.length > watchIndex + 1) {
+      return parts[watchIndex + 1];
+    }
+    if (u.hostname === 'nico.ms') {
+      const id = u.pathname.slice(1);
+      return id;
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+// Instagram 抽出（shortcode 形式など）
+function extractInstagramShortcode(url) {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split('/').filter(Boolean);
+    const idx = parts.findIndex(p => p === 'p' || p === 'reel' || p === 'tv' || p === 'media');
+    if (idx >= 0 && parts.length > idx + 1) {
+      return parts[idx + 1];
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+// TikTok 抽出
+function extractTikTokId(url) {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split('/').filter(Boolean);
+    const vidIndex = parts.findIndex(p => p === 'video');
+    if (vidIndex >= 0 && parts.length > vidIndex + 1) {
+      return parts[vidIndex + 1];
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+// X / Twitter 抽出
+function extractTweetId(url) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    if (host === 'twitter.com' || host === 'x.com' || host.endsWith('.twitter.com')) {
+      const parts = u.pathname.split('/').filter(Boolean);
+      const st = parts.indexOf('status');
+      if (st >= 0 && parts.length > st + 1) {
+        return parts[st + 1];
+      }
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+// iframe モード表示（補正＋各種対応）
+function showIframe() {
+  const vals = getInputValues();
+  if (!vals) return;
+  const { url, w, h } = vals;
+
+  const frame = document.getElementById('frame');
+  const img = document.getElementById('previewImage');
+  const viewer = document.getElementById('viewer');
+  viewer.style.display = 'block';
+
+  let finalSrc = url;
+  let useEmbed = true;  // iframe で読み込むかどうか
+
+  // YouTube 判定
+  const ytId = extractYouTubeId(url);
+  if (ytId !== null) {
+    try {
+      const u = new URL(url);
+      let startParam = '';
+      if (u.searchParams.has('t')) {
+        const t = u.searchParams.get('t');
+        if (t) startParam = `?start=${parseInt(t, 10)}`;
+      } else if (u.searchParams.has('start')) {
+        const s = u.searchParams.get('start');
+        if (s) startParam = `?start=${parseInt(s, 10)}`;
+      }
+      finalSrc = `https://www.youtube.com/embed/${ytId}${startParam}`;
+    } catch (e) {
+      finalSrc = `https://www.youtube.com/embed/${ytId}`;
+    }
+  } else {
+    // TikTok 判定
+    const tikId = extractTikTokId(url);
+    if (tikId !== null) {
+      finalSrc = `https://www.tiktok.com/embed/v3/${tikId}`;
+    } else {
+      // Instagram 判定
+      const insc = extractInstagramShortcode(url);
+      if (insc !== null) {
+        finalSrc = `https://www.instagram.com/p/${insc}/embed`;
+      } else {
+        // Vimeo 判定
+        const vId = extractVimeoId(url);
+        if (vId !== null) {
+          finalSrc = `https://player.vimeo.com/video/${vId}`;
+        } else {
+          // ニコニコ判定
+          const nId = extractNicoId(url);
+          if (nId !== null) {
+            finalSrc = `https://embed.nicovideo.jp/watch/${nId}`;
+          } else {
+            // X / Twitter 判定
+            const twId = extractTweetId(url);
+            if (twId !== null) {
+              useEmbed = false;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (useEmbed && finalSrc) {
+    frame.src = finalSrc;
+    frame.style.width = w + 'px';
+    frame.style.height = h + 'px';
+    frame.style.display = 'block';
+    img.style.display = 'none';
+  } else {
+    // iframe 形式では扱えない場合はスクリプト埋め込みなどで対応
+    frame.style.display = 'none';
+    img.style.display = 'none';
+    // 一旦 viewer 内をクリア
+    viewer.innerHTML = '';
+
+    const twId = extractTweetId(url);
+    if (twId !== null) {
+      const block = document.createElement('blockquote');
+      block.className = 'twitter-tweet';
+      block.setAttribute('data-lang', 'ja');
+      block.innerHTML = `<a href="https://twitter.com/i/web/status/${twId}"></a>`;
+      viewer.appendChild(block);
+      const script = document.createElement('script');
+      script.setAttribute('src', "https://platform.twitter.com/widgets.js");
+      script.setAttribute('async', '');
+      viewer.appendChild(script);
+    } else {
+      alert('この URL の埋め込みには対応していません。別タブで開きます。');
+      window.open(url, '_blank');
+    }
+  }
+
+  frame.onerror = () => {
+    console.warn('iframe 読み込み失敗：', finalSrc);
+    alert('この URL は iframe 埋め込みできない可能性があります。別タブで開きます。');
+    window.open(url, '_blank');
+  };
+}
+
+// 画像モード（そのまま）
+function showImage() {
+  const vals = getInputValues();
+  if (!vals) return;
+  const { url, w, h } = vals;
+  const encodedURL = encodeURIComponent(url);
+  const finalURL = `https://s.wordpress.com/mshots/v1/${encodedURL}?w=${w}&h=${h}&r=1`;
+  const frame = document.getElementById('frame');
+  const img = document.getElementById('previewImage');
+  const viewer = document.getElementById('viewer');
+  viewer.style.display = 'block';
+  img.src = finalURL;
+  img.style.display = 'block';
+  frame.style.display = 'none';
+}
+</script>
+
+
   </script>
 
 </body>
 </html>
+
