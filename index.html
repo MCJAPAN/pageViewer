@@ -109,145 +109,120 @@
   <div id="viewer" style="display:none;">
     <iframe id="frame" src="" sandbox="allow-scripts allow-forms allow-same-origin"></iframe>
     <img id="previewImage" src="" style="display:none;">
-  </div><script>
-// =====================
-// 共通ユーティリティ
-// =====================
-function applyPreset() {
-  const v = document.getElementById("preset").value;
-  if (!v) return;
-  const [w, h] = v.split("x");
-  width.value = w;
-  height.value = h;
+  </div>
+
+  <script>
+/* =========================
+   1秒後にUIをJSで生成
+========================= */
+let cmdLog, badgeBox, startTime;
+
+setTimeout(() => {
+  const viewer = document.getElementById("viewer");
+
+  badgeBox = document.createElement("div");
+  badgeBox.style.marginBottom = "0.5rem";
+
+  cmdLog = document.createElement("pre");
+  cmdLog.style.background = "#000";
+  cmdLog.style.color = "#0f0";
+  cmdLog.style.padding = "1rem";
+  cmdLog.style.borderRadius = "6px";
+  cmdLog.style.fontFamily = "Consolas, monospace";
+  cmdLog.style.fontSize = "0.85rem";
+  cmdLog.style.maxHeight = "220px";
+  cmdLog.style.overflow = "auto";
+
+  viewer.parentNode.insertBefore(badgeBox, viewer);
+  viewer.parentNode.insertBefore(cmdLog, viewer);
+}, 1000);
+
+/* =========================
+   ログ & 進捗管理
+========================= */
+let totalSteps = 1;
+let currentStep = 0;
+
+function startProgress(steps) {
+  totalSteps = steps;
+  currentStep = 0;
+  startTime = performance.now();
+  if (cmdLog) cmdLog.textContent = "";
 }
 
+function log(msg, type = "info") {
+  if (!cmdLog) return;
+  const color =
+    type === "success" ? "#ff0" :
+    type === "error" ? "#f00" :
+    "#0f0";
+  cmdLog.innerHTML += `<span style="color:${color}">${msg}</span>\n`;
+  cmdLog.scrollTop = cmdLog.scrollHeight;
+}
+
+function step(msg, ok = true) {
+  currentStep++;
+  const percent = Math.round((currentStep / totalSteps) * 100);
+  const bars = Math.round(percent / 5);
+  const bar = "I".repeat(bars) + " ".repeat(20 - bars);
+  log(msg, ok ? "success" : "error");
+  log(`${percent}% [${bar}]`);
+}
+
+function finish() {
+  const time = Math.round(performance.now() - startTime);
+  log(`完了 (${time} ms)`, "success");
+}
+
+function showBadge(name) {
+  if (!badgeBox) return;
+  badgeBox.innerHTML =
+    `<span style="
+      display:inline-block;
+      padding:0.3rem 0.7rem;
+      background:#4a90e2;
+      color:#fff;
+      border-radius:12px;
+      font-size:0.8rem;
+    ">${name}</span>`;
+}
+
+/* =========================
+   入力
+========================= */
 function getInputValues() {
   const url = document.getElementById("url").value.trim();
   const w = parseInt(width.value, 10);
   const h = parseInt(height.value, 10);
-
-  if (!url.startsWith("https://")) {
-    alert("https:// から始めて！");
-    return null;
-  }
-  if (isNaN(w) || isNaN(h)) {
-    alert("サイズ入れて！");
-    return null;
-  }
+  if (!url.startsWith("https://") || isNaN(w) || isNaN(h)) return null;
   return { url, w, h };
 }
 
-// =====================
-// 各サービス判定
-// =====================
+/* =========================
+   埋め込み判定
+========================= */
+const services = [
+  ["Imgur", u => u.hostname.includes("imgur.com") ? `https://i.imgur.com/${u.pathname.split("/").filter(Boolean)[0]}.jpg` : null],
+  ["Pornhub", u => u.hostname.includes("pornhub.com") ? `https://www.pornhub.com/embed/${u.searchParams.get("viewkey")}` : null],
+  ["Xvideos", u => u.hostname.includes("xvideos.com") ? `https://www.xvideos.com/embedframe/${(u.pathname.match(/video(\d+)/)||[])[1]}` : null],
+  ["FC2", u => u.hostname.endsWith("fc2.com") ? `https://video.fc2.com/embed/${u.pathname.split("/").filter(Boolean)[1]}` : null],
+  ["Twitch", u => u.hostname.endsWith("twitch.tv") ? `https://player.twitch.tv/?video=${u.pathname.split("/")[2]}&parent=${location.hostname}` : null],
+  ["Dailymotion", u => u.hostname.includes("dailymotion.com") ? `https://www.dailymotion.com/embed/video/${(u.pathname.match(/video\/([^_]+)/)||[])[1]}` : null],
+  ["Facebook", u => u.hostname.includes("facebook.com") ? `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(u.href)}` : null],
+];
 
-// Imgur
-function embedImgur(url) {
-  try {
-    const u = new URL(url);
-    if (!u.hostname.includes("imgur.com")) return null;
-
-    if (u.hostname === "i.imgur.com") return url;
-
-    const id = u.pathname.split("/").filter(Boolean)[0];
-    if (id) return `https://i.imgur.com/${id}.jpg`;
-  } catch {}
-  return null;
-}
-
-// Pornhub
-function embedPornhub(url) {
-  try {
-    const u = new URL(url);
-    if (!u.hostname.includes("pornhub.com")) return null;
-
-    if (u.pathname.startsWith("/embed/")) return url;
-
-    const key = u.searchParams.get("viewkey");
-    if (key) return `https://www.pornhub.com/embed/${key}`;
-  } catch {}
-  return null;
-}
-
-// Xvideos
-function embedXvideos(url) {
-  try {
-    const u = new URL(url);
-    if (!u.hostname.includes("xvideos.com")) return null;
-
-    if (u.pathname.startsWith("/embedframe/")) return url;
-
-    const m = u.pathname.match(/video(\d+)/);
-    if (m) return `https://www.xvideos.com/embedframe/${m[1]}`;
-  } catch {}
-  return null;
-}
-
-// FC2
-function embedFC2(url) {
-  try {
-    const u = new URL(url);
-    if (!u.hostname.endsWith("fc2.com")) return null;
-
-    if (u.pathname.startsWith("/embed/")) return url;
-
-    const p = u.pathname.split("/").filter(Boolean);
-    if (p[0] === "content" && p[1]) {
-      return `https://video.fc2.com/embed/${p[1]}`;
-    }
-  } catch {}
-  return null;
-}
-
-// Twitch
-function embedTwitch(url) {
-  try {
-    const u = new URL(url);
-    if (!u.hostname.endsWith("twitch.tv")) return null;
-
-    if (u.hostname === "player.twitch.tv") return url;
-
-    const p = u.pathname.split("/").filter(Boolean);
-    if (p[0] === "videos" && p[1]) {
-      return `https://player.twitch.tv/?video=${p[1]}&parent=${location.hostname}`;
-    }
-  } catch {}
-  return null;
-}
-
-// Dailymotion
-function embedDailymotion(url) {
-  try {
-    const u = new URL(url);
-    if (!u.hostname.includes("dailymotion.com")) return null;
-
-    if (u.pathname.startsWith("/embed/video/")) return url;
-
-    const m = u.pathname.match(/video\/([^_]+)/);
-    if (m) return `https://www.dailymotion.com/embed/video/${m[1]}`;
-  } catch {}
-  return null;
-}
-
-// Facebook
-function embedFacebook(url) {
-  try {
-    const u = new URL(url);
-    if (!u.hostname.includes("facebook.com")) return null;
-
-    return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}`;
-  } catch {}
-  return null;
-}
-
-// =====================
-// iframe モード
-// =====================
+/* =========================
+   iframe モード
+========================= */
 function showIframe() {
-  const v = getInputValues();
-  if (!v) return;
-  const { url, w, h } = v;
+  const vals = getInputValues();
+  if (!vals) return;
 
+  startProgress(services.length + 3);
+  step("入力値補正中...");
+
+  const { url, w, h } = vals;
+  const u = new URL(url);
   const frame = document.getElementById("frame");
   const img = document.getElementById("previewImage");
   const viewer = document.getElementById("viewer");
@@ -255,49 +230,37 @@ function showIframe() {
   viewer.style.display = "block";
   img.style.display = "none";
 
-  const finalSrc =
-    embedTwitch(url) ||
-    embedPornhub(url) ||
-    embedXvideos(url) ||
-    embedFC2(url) ||
-    embedDailymotion(url) ||
-    embedFacebook(url) ||
-    embedImgur(url) ||
-    url;
+  let finalSrc = url;
+  let detected = null;
 
+  for (const [name, fn] of services) {
+    step(`${name}判定中...`);
+    const r = fn(u);
+    if (r && !r.includes("undefined")) {
+      detected = name;
+      finalSrc = r;
+      break;
+    }
+  }
+
+  step("URL適用中...");
   frame.src = finalSrc;
   frame.style.width = w + "px";
   frame.style.height = h + "px";
   frame.style.display = "block";
 
-  frame.onerror = () => {
-    alert("iframe不可。別タブで開くね");
-    window.open(url, "_blank");
-  };
-}
+  if (detected) showBadge(detected);
+  else log("対応サービス未検出（通常iframe）", "error");
 
-// =====================
-// 画像モード
-// =====================
-function showImage() {
-  const v = getInputValues();
-  if (!v) return;
-  const { url, w, h } = v;
-
-  const img = document.getElementById("previewImage");
-  const frame = document.getElementById("frame");
-  const viewer = document.getElementById("viewer");
-
-  img.src = `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=${w}&h=${h}`;
-  img.style.display = "block";
-  frame.style.display = "none";
-  viewer.style.display = "block";
+  finish();
 }
 </script>
 
 
+
 </body>
 </html>
+
 
 
 
