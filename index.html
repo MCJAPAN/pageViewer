@@ -254,12 +254,108 @@ function showIframe() {
 
   finish();
 }
+/* =========================
+   バージョン & 更新履歴
+========================= */
+
+// 🔧 ここだけ編集すればOK
+const APP_VERSION = "v2.1.1";
+
+// ✍️ アップデート履歴（テキストは自由に編集）
+const UPDATE_HISTORY = [
+  {
+    version: "v2.1.1",
+    date: "2026-01-21",
+    text: `
+- Twitch 埋め込み誤判定を修正
+- 対応サービス判定ロジックを強化
+- CMD風ログに進捗バー追加
+- バージョン履歴表示追加
+`
+  },
+  {
+    version: "v2.1.0",
+    date: "2026-01-18",
+    text: `
+- FC2 / Dailymotion / Facebook 対応
+- 実行時間(ms)表示を追加
+`
+  },
+  {
+    version: "v1.0.0",
+    date: "2025-08-02",
+    text: `
+- v.1.0.0リリース
+- Vercelを利用してWebサイトを公開
+`
+  }
+];
+
+setTimeout(() => {
+  const root = document.body;
+
+  /* ===== バージョン表示 ===== */
+  const ver = document.createElement("div");
+  ver.textContent = APP_VERSION;
+  ver.style.position = "fixed";
+  ver.style.top = "8px";
+  ver.style.right = "12px";
+  ver.style.fontFamily = "Consolas, monospace";
+  ver.style.fontSize = "0.75rem";
+  ver.style.color = "#aaa";
+  ver.style.opacity = "0.8";
+
+  /* ===== 更新履歴ボタン ===== */
+  const btn = document.createElement("button");
+  btn.textContent = "UPDATE LOG";
+  btn.style.position = "fixed";
+  btn.style.bottom = "12px";
+  btn.style.right = "12px";
+  btn.style.background = "#000";
+  btn.style.color = "#0f0";
+  btn.style.border = "1px solid #0f0";
+  btn.style.padding = "6px 10px";
+  btn.style.fontFamily = "Consolas, monospace";
+  btn.style.cursor = "pointer";
+
+  /* ===== 更新履歴画面 ===== */
+  const panel = document.createElement("pre");
+  panel.style.position = "fixed";
+  panel.style.bottom = "50px";
+  panel.style.right = "12px";
+  panel.style.width = "420px";
+  panel.style.maxHeight = "300px";
+  panel.style.overflow = "auto";
+  panel.style.background = "#000";
+  panel.style.color = "#0f0";
+  panel.style.border = "1px solid #0f0";
+  panel.style.padding = "1rem";
+  panel.style.fontFamily = "Consolas, monospace";
+  panel.style.fontSize = "0.8rem";
+  panel.style.display = "none";
+
+  panel.textContent = UPDATE_HISTORY.map(h =>
+`[${h.version}] ${h.date}
+${h.text.trim()}
+------------------------------
+`).join("\n");
+
+  btn.onclick = () => {
+    panel.style.display =
+      panel.style.display === "none" ? "block" : "none";
+  };
+
+  root.appendChild(ver);
+  root.appendChild(btn);
+  root.appendChild(panel);
+}, 1000);
 </script>
 
 
 
 </body>
 </html>
+
 
 
 
