@@ -138,118 +138,20 @@ function getInputValues() {
   return { url, w, h };
 }
 
-// 補正ロジック：YouTube ID 抽出
-function extractYouTubeId(url) {
-  try {
-    const u = new URL(url);
-    if (u.searchParams.has('v')) {
-      const v = u.searchParams.get('v');
-      if (v && /^[A-Za-z0-9_-]{11}$/.test(v)) {
-        return v;
-      }
-    }
-    if (u.hostname === 'youtu.be' || u.hostname === 'www.youtu.be') {
-      const id = u.pathname.slice(1);
-      if (/^[A-Za-z0-9_-]{11}$/.test(id)) {
-        return id;
-      }
-    }
-    const parts = u.pathname.split('/');
-    const embedIndex = parts.indexOf('embed');
-    if (embedIndex >= 0 && parts.length > embedIndex + 1) {
-      const id = parts[embedIndex + 1];
-      if (/^[A-Za-z0-9_-]{11}$/.test(id)) {
-        return id;
-      }
-    }
-    const shortsIndex = parts.indexOf('shorts');
-    if (shortsIndex >= 0 && parts.length > shortsIndex + 1) {
-      const id = parts[shortsIndex + 1];
-      if (/^[A-Za-z0-9_-]{11}$/.test(id)) {
-        return id;
-      }
-    }
-  } catch (e) {
-    return null;
-  }
-  return null;
-}
 
-// Vimeo 補正ロジック
-function extractVimeoId(url) {
-  try {
-    const u = new URL(url);
-    const parts = u.pathname.split('/');
-    for (const part of parts) {
-      if (/^[0-9]+$/.test(part)) {
-        return part;
-      }
-    }
-  } catch (e) {
-    return null;
-  }
-  return null;
-}
 
-// ニコニコ補正ロジック
-function extractNicoId(url) {
-  try {
-    const u = new URL(url);
-    const parts = u.pathname.split('/');
-    const watchIndex = parts.indexOf('watch');
-    if (watchIndex >= 0 && parts.length > watchIndex + 1) {
-      return parts[watchIndex + 1];
-    }
-    if (u.hostname === 'nico.ms') {
-      const id = u.pathname.slice(1);
-      return id;
-    }
-  } catch (e) {
-    return null;
-  }
-  return null;
-}
 
-// Instagram 抽出（shortcode 形式など）
-function extractInstagramShortcode(url) {
+// Imgur 抽出
+function extractImgur(url) {
   try {
     const u = new URL(url);
-    const parts = u.pathname.split('/').filter(Boolean);
-    const idx = parts.findIndex(p => p === 'p' || p === 'reel' || p === 'tv' || p === 'media');
-    if (idx >= 0 && parts.length > idx + 1) {
-      return parts[idx + 1];
+    if (u.hostname === 'i.imgur.com') {
+      return url;
     }
-  } catch (e) {
-    return null;
-  }
-  return null;
-}
-
-// TikTok 抽出
-function extractTikTokId(url) {
-  try {
-    const u = new URL(url);
-    const parts = u.pathname.split('/').filter(Boolean);
-    const vidIndex = parts.findIndex(p => p === 'video');
-    if (vidIndex >= 0 && parts.length > vidIndex + 1) {
-      return parts[vidIndex + 1];
-    }
-  } catch (e) {
-    return null;
-  }
-  return null;
-}
-
-// X / Twitter 抽出
-function extractTweetId(url) {
-  try {
-    const u = new URL(url);
-    const host = u.hostname.toLowerCase();
-    if (host === 'twitter.com' || host === 'x.com' || host.endsWith('.twitter.com')) {
+    if (u.hostname === 'imgur.com' || u.hostname === 'www.imgur.com') {
       const parts = u.pathname.split('/').filter(Boolean);
-      const st = parts.indexOf('status');
-      if (st >= 0 && parts.length > st + 1) {
-        return parts[st + 1];
+      if (parts.length > 0) {
+        return `https://i.imgur.com/${parts[0]}.jpg`;
       }
     }
   } catch (e) {
@@ -258,6 +160,100 @@ function extractTweetId(url) {
   return null;
 }
 
+// Pornhub 抽出
+function extractPornhub(url) {
+  try {
+    const u = new URL(url);
+    if (u.pathname.startsWith('/embed/')) {
+      return url;
+    }
+    const key = u.searchParams.get('viewkey');
+    if (key) {
+      return `https://www.pornhub.com/embed/${key}`;
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+// Xvideos 抽出
+function extractXvideos(url) {
+  try {
+    const u = new URL(url);
+    if (u.pathname.startsWith('/embedframe/')) {
+      return url;
+    }
+    const m = u.pathname.match(/\/video(\d+)/);
+    if (m && m[1]) {
+      return `https://www.xvideos.com/embedframe/${m[1]}`;
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+// FC2 動画 抽出
+function extractFC2(url) {
+  try {
+    const u = new URL(url);
+    if (u.pathname.startsWith('/embed/')) {
+      return url;
+    }
+    const parts = u.pathname.split('/');
+    if (parts.length >= 3) {
+      return `https://video.fc2.com/embed/${parts[2]}`;
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+// Twitch 抽出
+function extractTwitch(url) {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split('/').filter(Boolean);
+    if (parts[0] === 'videos' && parts.length > 1) {
+      return `https://player.twitch.tv/?video=${parts[1]}&parent=${location.hostname}`;
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+// Dailymotion 抽出
+function extractDailymotion(url) {
+  try {
+    const u = new URL(url);
+    if (u.pathname.startsWith('/embed/video/')) {
+      return url;
+    }
+    const m = u.pathname.match(/\/video\/([^_]+)/);
+    if (m && m[1]) {
+      return `https://www.dailymotion.com/embed/video/${m[1]}`;
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+// Facebook 抽出
+function extractFacebook(url) {
+  try {
+    new URL(url);
+    return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}`;
+  } catch (e) {
+    return null;
+  }
+}
+
+
+    
 // iframe モード表示（補正＋各種対応）
 function showIframe() {
   const vals = getInputValues();
@@ -300,20 +296,62 @@ function showIframe() {
       if (insc !== null) {
         finalSrc = `https://www.instagram.com/p/${insc}/embed`;
       } else {
-        // Vimeo 判定
-        const vId = extractVimeoId(url);
-        if (vId !== null) {
-          finalSrc = `https://player.vimeo.com/video/${vId}`;
+        // Imgur 判定
+        const imgur = extractImgur(url);
+        if (imgur !== null) {
+          finalSrc = imgur;
         } else {
-          // ニコニコ判定
-          const nId = extractNicoId(url);
-          if (nId !== null) {
-            finalSrc = `https://embed.nicovideo.jp/watch/${nId}`;
+          // Pornhub 判定
+          const ph = extractPornhub(url);
+          if (ph !== null) {
+            finalSrc = ph;
           } else {
-            // X / Twitter 判定
-            const twId = extractTweetId(url);
-            if (twId !== null) {
-              useEmbed = false;
+            // Xvideos 判定
+            const xv = extractXvideos(url);
+            if (xv !== null) {
+              finalSrc = xv;
+            } else {
+              // FC2 判定
+              const fc2 = extractFC2(url);
+              if (fc2 !== null) {
+                finalSrc = fc2;
+              } else {
+                // Twitch 判定
+                const twc = extractTwitch(url);
+                if (twc !== null) {
+                  finalSrc = twc;
+                } else {
+                  // Dailymotion 判定
+                  const dm = extractDailymotion(url);
+                  if (dm !== null) {
+                    finalSrc = dm;
+                  } else {
+                    // Facebook 判定
+                    const fb = extractFacebook(url);
+                    if (fb !== null) {
+                      finalSrc = fb;
+                    } else {
+                      // Vimeo 判定
+                      const vId = extractVimeoId(url);
+                      if (vId !== null) {
+                        finalSrc = `https://player.vimeo.com/video/${vId}`;
+                      } else {
+                        // ニコニコ判定
+                        const nId = extractNicoId(url);
+                        if (nId !== null) {
+                          finalSrc = `https://embed.nicovideo.jp/watch/${nId}`;
+                        } else {
+                          // X / Twitter 判定
+                          const twId = extractTweetId(url);
+                          if (twId !== null) {
+                            useEmbed = false;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         }
@@ -328,10 +366,8 @@ function showIframe() {
     frame.style.display = 'block';
     img.style.display = 'none';
   } else {
-    // iframe 形式では扱えない場合はスクリプト埋め込みなどで対応
     frame.style.display = 'none';
     img.style.display = 'none';
-    // 一旦 viewer 内をクリア
     viewer.innerHTML = '';
 
     const twId = extractTweetId(url);
@@ -341,9 +377,10 @@ function showIframe() {
       block.setAttribute('data-lang', 'ja');
       block.innerHTML = `<a href="https://twitter.com/i/web/status/${twId}"></a>`;
       viewer.appendChild(block);
+
       const script = document.createElement('script');
-      script.setAttribute('src', "https://platform.twitter.com/widgets.js");
-      script.setAttribute('async', '');
+      script.src = "https://platform.twitter.com/widgets.js";
+      script.async = true;
       viewer.appendChild(script);
     } else {
       alert('この URL の埋め込みには対応していません。別タブで開きます。');
@@ -357,6 +394,7 @@ function showIframe() {
     window.open(url, '_blank');
   };
 }
+
 
 // 画像モード（そのまま）
 function showImage() {
@@ -377,5 +415,6 @@ function showImage() {
 
 </body>
 </html>
+
 
 
