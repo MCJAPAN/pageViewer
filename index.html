@@ -110,9 +110,10 @@
     <iframe id="frame" src="" sandbox="allow-scripts allow-forms allow-same-origin"></iframe>
     <img id="previewImage" src="" style="display:none;">
   </div>
-
-  <script>
-// 元の applyPreset（そのまま使える）
+<script>
+// =========================
+// プリセット適用
+// =========================
 function applyPreset() {
   const value = document.getElementById("preset").value;
   if (!value) return;
@@ -121,7 +122,9 @@ function applyPreset() {
   document.getElementById("height").value = h;
 }
 
+// =========================
 // 入力値取得・検証
+// =========================
 function getInputValues() {
   const url = document.getElementById('url').value.trim();
   const h = parseInt(document.getElementById('height').value.trim(), 10);
@@ -138,123 +141,160 @@ function getInputValues() {
   return { url, w, h };
 }
 
+// =========================
+// extract 系（全定義）
+// =========================
 
+// YouTube
+function extractYouTubeId(url) {
+  try {
+    const u = new URL(url);
+    if (u.searchParams.has('v')) {
+      const v = u.searchParams.get('v');
+      if (/^[A-Za-z0-9_-]{11}$/.test(v)) return v;
+    }
+    if (u.hostname === 'youtu.be') {
+      const id = u.pathname.slice(1);
+      if (/^[A-Za-z0-9_-]{11}$/.test(id)) return id;
+    }
+    const p = u.pathname.split('/');
+    const i = p.indexOf('embed');
+    if (i >= 0 && p[i + 1]) return p[i + 1];
+    const s = p.indexOf('shorts');
+    if (s >= 0 && p[s + 1]) return p[s + 1];
+  } catch {}
+  return null;
+}
 
+// Vimeo
+function extractVimeoId(url) {
+  try {
+    const p = new URL(url).pathname.split('/');
+    for (const part of p) if (/^\d+$/.test(part)) return part;
+  } catch {}
+  return null;
+}
 
-// Imgur 抽出
+// ニコニコ
+function extractNicoId(url) {
+  try {
+    const u = new URL(url);
+    const p = u.pathname.split('/');
+    const i = p.indexOf('watch');
+    if (i >= 0 && p[i + 1]) return p[i + 1];
+    if (u.hostname === 'nico.ms') return u.pathname.slice(1);
+  } catch {}
+  return null;
+}
+
+// Instagram
+function extractInstagramShortcode(url) {
+  try {
+    const p = new URL(url).pathname.split('/').filter(Boolean);
+    const i = p.findIndex(x => x === 'p' || x === 'reel' || x === 'tv');
+    if (i >= 0 && p[i + 1]) return p[i + 1];
+  } catch {}
+  return null;
+}
+
+// TikTok
+function extractTikTokId(url) {
+  try {
+    const p = new URL(url).pathname.split('/').filter(Boolean);
+    const i = p.indexOf('video');
+    if (i >= 0 && p[i + 1]) return p[i + 1];
+  } catch {}
+  return null;
+}
+
+// X / Twitter
+function extractTweetId(url) {
+  try {
+    const p = new URL(url).pathname.split('/').filter(Boolean);
+    const i = p.indexOf('status');
+    if (i >= 0 && p[i + 1]) return p[i + 1];
+  } catch {}
+  return null;
+}
+
+// Imgur
 function extractImgur(url) {
   try {
     const u = new URL(url);
-    if (u.hostname === 'i.imgur.com') {
-      return url;
-    }
+    if (u.hostname === 'i.imgur.com') return url;
     if (u.hostname === 'imgur.com' || u.hostname === 'www.imgur.com') {
-      const parts = u.pathname.split('/').filter(Boolean);
-      if (parts.length > 0) {
-        return `https://i.imgur.com/${parts[0]}.jpg`;
-      }
+      const p = u.pathname.split('/').filter(Boolean);
+      if (p[0]) return `https://i.imgur.com/${p[0]}.jpg`;
     }
-  } catch (e) {
-    return null;
-  }
+  } catch {}
   return null;
 }
 
-// Pornhub 抽出
+// Pornhub
 function extractPornhub(url) {
   try {
     const u = new URL(url);
-    if (u.pathname.startsWith('/embed/')) {
-      return url;
-    }
-    const key = u.searchParams.get('viewkey');
-    if (key) {
-      return `https://www.pornhub.com/embed/${key}`;
-    }
-  } catch (e) {
-    return null;
-  }
+    if (u.pathname.startsWith('/embed/')) return url;
+    const k = u.searchParams.get('viewkey');
+    if (k) return `https://www.pornhub.com/embed/${k}`;
+  } catch {}
   return null;
 }
 
-// Xvideos 抽出
+// Xvideos
 function extractXvideos(url) {
   try {
     const u = new URL(url);
-    if (u.pathname.startsWith('/embedframe/')) {
-      return url;
-    }
+    if (u.pathname.startsWith('/embedframe/')) return url;
     const m = u.pathname.match(/\/video(\d+)/);
-    if (m && m[1]) {
-      return `https://www.xvideos.com/embedframe/${m[1]}`;
-    }
-  } catch (e) {
-    return null;
-  }
+    if (m) return `https://www.xvideos.com/embedframe/${m[1]}`;
+  } catch {}
   return null;
 }
 
-// FC2 動画 抽出
+// FC2
 function extractFC2(url) {
   try {
-    const u = new URL(url);
-    if (u.pathname.startsWith('/embed/')) {
-      return url;
-    }
-    const parts = u.pathname.split('/');
-    if (parts.length >= 3) {
-      return `https://video.fc2.com/embed/${parts[2]}`;
-    }
-  } catch (e) {
-    return null;
-  }
+    const p = new URL(url).pathname.split('/');
+    if (p[2]) return `https://video.fc2.com/embed/${p[2]}`;
+  } catch {}
   return null;
 }
 
-// Twitch 抽出
+// Twitch
 function extractTwitch(url) {
   try {
-    const u = new URL(url);
-    const parts = u.pathname.split('/').filter(Boolean);
-    if (parts[0] === 'videos' && parts.length > 1) {
-      return `https://player.twitch.tv/?video=${parts[1]}&parent=${location.hostname}`;
+    const p = new URL(url).pathname.split('/').filter(Boolean);
+    if (p[0] === 'videos' && p[1]) {
+      return `https://player.twitch.tv/?video=${p[1]}&parent=${location.hostname}`;
     }
-  } catch (e) {
-    return null;
-  }
+  } catch {}
   return null;
 }
 
-// Dailymotion 抽出
+// Dailymotion
 function extractDailymotion(url) {
   try {
     const u = new URL(url);
-    if (u.pathname.startsWith('/embed/video/')) {
-      return url;
-    }
+    if (u.pathname.startsWith('/embed/video/')) return url;
     const m = u.pathname.match(/\/video\/([^_]+)/);
-    if (m && m[1]) {
-      return `https://www.dailymotion.com/embed/video/${m[1]}`;
-    }
-  } catch (e) {
-    return null;
-  }
+    if (m) return `https://www.dailymotion.com/embed/video/${m[1]}`;
+  } catch {}
   return null;
 }
 
-// Facebook 抽出
+// Facebook
 function extractFacebook(url) {
   try {
     new URL(url);
     return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}`;
-  } catch (e) {
-    return null;
-  }
+  } catch {}
+  return null;
 }
 
-
-    
-// iframe モード表示（補正＋各種対応）
+// =========================
+// iframe モード
+// =========================
 function showIframe() {
   const vals = getInputValues();
   if (!vals) return;
@@ -265,99 +305,23 @@ function showIframe() {
   const viewer = document.getElementById('viewer');
   viewer.style.display = 'block';
 
-  let finalSrc = url;
-  let useEmbed = true;  // iframe で読み込むかどうか
+  let finalSrc = null;
+  let useEmbed = true;
 
-  // YouTube 判定
-  const ytId = extractYouTubeId(url);
-  if (ytId !== null) {
-    try {
-      const u = new URL(url);
-      let startParam = '';
-      if (u.searchParams.has('t')) {
-        const t = u.searchParams.get('t');
-        if (t) startParam = `?start=${parseInt(t, 10)}`;
-      } else if (u.searchParams.has('start')) {
-        const s = u.searchParams.get('start');
-        if (s) startParam = `?start=${parseInt(s, 10)}`;
-      }
-      finalSrc = `https://www.youtube.com/embed/${ytId}${startParam}`;
-    } catch (e) {
-      finalSrc = `https://www.youtube.com/embed/${ytId}`;
-    }
-  } else {
-    // TikTok 判定
-    const tikId = extractTikTokId(url);
-    if (tikId !== null) {
-      finalSrc = `https://www.tiktok.com/embed/v3/${tikId}`;
-    } else {
-      // Instagram 判定
-      const insc = extractInstagramShortcode(url);
-      if (insc !== null) {
-        finalSrc = `https://www.instagram.com/p/${insc}/embed`;
-      } else {
-        // Imgur 判定
-        const imgur = extractImgur(url);
-        if (imgur !== null) {
-          finalSrc = imgur;
-        } else {
-          // Pornhub 判定
-          const ph = extractPornhub(url);
-          if (ph !== null) {
-            finalSrc = ph;
-          } else {
-            // Xvideos 判定
-            const xv = extractXvideos(url);
-            if (xv !== null) {
-              finalSrc = xv;
-            } else {
-              // FC2 判定
-              const fc2 = extractFC2(url);
-              if (fc2 !== null) {
-                finalSrc = fc2;
-              } else {
-                // Twitch 判定
-                const twc = extractTwitch(url);
-                if (twc !== null) {
-                  finalSrc = twc;
-                } else {
-                  // Dailymotion 判定
-                  const dm = extractDailymotion(url);
-                  if (dm !== null) {
-                    finalSrc = dm;
-                  } else {
-                    // Facebook 判定
-                    const fb = extractFacebook(url);
-                    if (fb !== null) {
-                      finalSrc = fb;
-                    } else {
-                      // Vimeo 判定
-                      const vId = extractVimeoId(url);
-                      if (vId !== null) {
-                        finalSrc = `https://player.vimeo.com/video/${vId}`;
-                      } else {
-                        // ニコニコ判定
-                        const nId = extractNicoId(url);
-                        if (nId !== null) {
-                          finalSrc = `https://embed.nicovideo.jp/watch/${nId}`;
-                        } else {
-                          // X / Twitter 判定
-                          const twId = extractTweetId(url);
-                          if (twId !== null) {
-                            useEmbed = false;
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+  const yt = extractYouTubeId(url);
+  if (yt) finalSrc = `https://www.youtube.com/embed/${yt}`;
+  else if (extractTikTokId(url)) finalSrc = `https://www.tiktok.com/embed/v3/${extractTikTokId(url)}`;
+  else if (extractInstagramShortcode(url)) finalSrc = `https://www.instagram.com/p/${extractInstagramShortcode(url)}/embed`;
+  else if (extractImgur(url)) finalSrc = extractImgur(url);
+  else if (extractPornhub(url)) finalSrc = extractPornhub(url);
+  else if (extractXvideos(url)) finalSrc = extractXvideos(url);
+  else if (extractFC2(url)) finalSrc = extractFC2(url);
+  else if (extractTwitch(url)) finalSrc = extractTwitch(url);
+  else if (extractDailymotion(url)) finalSrc = extractDailymotion(url);
+  else if (extractFacebook(url)) finalSrc = extractFacebook(url);
+  else if (extractVimeoId(url)) finalSrc = `https://player.vimeo.com/video/${extractVimeoId(url)}`;
+  else if (extractNicoId(url)) finalSrc = `https://embed.nicovideo.jp/watch/${extractNicoId(url)}`;
+  else if (extractTweetId(url)) useEmbed = false;
 
   if (useEmbed && finalSrc) {
     frame.src = finalSrc;
@@ -369,52 +333,43 @@ function showIframe() {
     frame.style.display = 'none';
     img.style.display = 'none';
     viewer.innerHTML = '';
-
-    const twId = extractTweetId(url);
-    if (twId !== null) {
-      const block = document.createElement('blockquote');
-      block.className = 'twitter-tweet';
-      block.setAttribute('data-lang', 'ja');
-      block.innerHTML = `<a href="https://twitter.com/i/web/status/${twId}"></a>`;
-      viewer.appendChild(block);
-
-      const script = document.createElement('script');
-      script.src = "https://platform.twitter.com/widgets.js";
-      script.async = true;
-      viewer.appendChild(script);
+    const tw = extractTweetId(url);
+    if (tw) {
+      const b = document.createElement('blockquote');
+      b.className = 'twitter-tweet';
+      b.innerHTML = `<a href="https://twitter.com/i/web/status/${tw}"></a>`;
+      viewer.appendChild(b);
+      const s = document.createElement('script');
+      s.src = 'https://platform.twitter.com/widgets.js';
+      s.async = true;
+      viewer.appendChild(s);
     } else {
-      alert('この URL の埋め込みには対応していません。別タブで開きます。');
       window.open(url, '_blank');
     }
   }
-
-  frame.onerror = () => {
-    console.warn('iframe 読み込み失敗：', finalSrc);
-    alert('この URL は iframe 埋め込みできない可能性があります。別タブで開きます。');
-    window.open(url, '_blank');
-  };
 }
 
-
-// 画像モード（そのまま）
+// =========================
+// 画像モード
+// =========================
 function showImage() {
   const vals = getInputValues();
   if (!vals) return;
   const { url, w, h } = vals;
-  const encodedURL = encodeURIComponent(url);
-  const finalURL = `https://s.wordpress.com/mshots/v1/${encodedURL}?w=${w}&h=${h}&r=1`;
-  const frame = document.getElementById('frame');
   const img = document.getElementById('previewImage');
+  const frame = document.getElementById('frame');
   const viewer = document.getElementById('viewer');
   viewer.style.display = 'block';
-  img.src = finalURL;
+  img.src = `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=${w}&h=${h}&r=1`;
   img.style.display = 'block';
   frame.style.display = 'none';
 }
 </script>
 
+
 </body>
 </html>
+
 
 
 
